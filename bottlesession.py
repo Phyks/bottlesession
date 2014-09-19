@@ -22,11 +22,11 @@ def authenticator(session_manager, login_url='/auth/login'):
             (default: ``'/auth/login'``).
     '''
     def valid_user(login_url=login_url):
-        def decorator(handler, *a, **ka):
+        def decorator(handler, *args, **kargs):
             import functools
 
             @functools.wraps(handler)
-            def check_auth(*a, **ka):
+            def check_auth(*args, **kargs):
                 try:
                     data = session_manager.get_session()
                     if not data['valid']:
@@ -42,7 +42,7 @@ def authenticator(session_manager, login_url='/auth/login'):
                 if data.get('name'):
                     bottle.request.environ['REMOTE_USER'] = data['name']
 
-                return handler(*a, **ka)
+                return handler(*args, **kargs)
             return check_auth
         return decorator
     return(valid_user)
@@ -75,7 +75,7 @@ class BaseSession(object):
 
     def allocate_new_session_id(self):
         #  retry allocating a unique sessionid
-        for i in xrange(100):
+        for i in range(100):
             sessionid = self.make_session_id()
             if not self.load(sessionid):
                 return sessionid
@@ -83,7 +83,7 @@ class BaseSession(object):
 
     def get_session(self):
         #  get existing or create new session identifier
-        sessionid = bottle.request.COOKIES.get('sessionid')
+        sessionid = bottle.request.cookies.get('sessionid')
         if not sessionid:
             sessionid = self.allocate_new_session_id()
             bottle.response.set_cookie(
@@ -113,7 +113,7 @@ class PickleSession(BaseSession):
         filename = os.path.join(self.session_dir, 'session-%s' % sessionid)
         if not os.path.exists(filename):
             return None
-        with open(filename, 'r') as fp:
+        with open(filename, 'rb') as fp:
             session = pickle.load(fp)
         return session
 
@@ -121,7 +121,7 @@ class PickleSession(BaseSession):
         sessionid = data['sessionid']
         fileName = os.path.join(self.session_dir, 'session-%s' % sessionid)
         tmpName = fileName + '.' + str(uuid.uuid4())
-        with open(tmpName, 'w') as fp:
+        with open(tmpName, 'wb') as fp:
             self.session = pickle.dump(data, fp)
         os.rename(tmpName, fileName)
 
@@ -166,10 +166,10 @@ class CookieSession(BaseSession):
             else:
                 #  save off a secret to a tmp file
                 secret = ''.join([
-                    random.choice(string.letters)
+                    random.choice(string.ascii_letters)
                     for x in range(32)])
 
-                old_umask = os.umask(077)
+                old_umask = os.umask(0o77)
                 with open(tmpfilename, 'w') as fp:
                     fp.write(secret)
                 os.umask(old_umask)
